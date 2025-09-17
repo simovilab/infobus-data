@@ -132,7 +132,8 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env.local  # Local secrets and overrides
+.env.local
+.env.*.local
 .venv
 env/
 venv/
