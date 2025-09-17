@@ -37,3 +37,14 @@ def health_check(request):
             "status": "unhealthy",
             "error": str(e)
         }, status=503)
+
+
+def hot_reload_test(request):
+    """Test endpoint to demonstrate hot reload functionality."""
+    return JsonResponse({
+        "message": "🚀 Hot reload is AMAZING! File changes detected instantly! 🔥",
+        "status": "success",
+        "version": 2,
+        "hot_reload": "active",
+        "timestamp": "2025-09-17T02:57:00Z"
+    })

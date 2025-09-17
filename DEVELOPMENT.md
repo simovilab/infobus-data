@@ -68,6 +68,34 @@ Static files are automatically collected and served by Django when:
 
 The URL configuration includes custom static file serving that works even when `DEBUG=False`.
 
+## Hot Reload in Development
+
+The development environment includes **true hot reload** functionality:
+
+### Django Web Server
+- ✅ **Auto-restart** when Python files change
+- ✅ **Template reload** when HTML/CSS/JS files change
+- ✅ **Immediate reflection** of code changes without manual restart
+- ✅ **Volume mounting** excludes `.venv` to prevent conflicts
+
+### Celery Services
+- ✅ **Watchdog-based monitoring** for Python file changes
+- ✅ **Auto-restart** of worker and beat processes
+- ✅ **Live task updates** when task code changes
+
+### Hot Reload Features
+- **Environment Variables**: `PYTHONUNBUFFERED=1`, `PYTHONDONTWRITEBYTECODE=1`
+- **File Watching**: Uses Django's built-in reloader + watchdog for Celery
+- **Volume Optimization**: Source code mounted with `.venv` exclusion
+- **Development Dependencies**: Includes `watchdog` package for advanced monitoring
+
+### Testing Hot Reload
+Test the hot reload functionality:
+```bash
+curl http://localhost:8000/test-reload/
+```
+Then modify `website/views.py` and test again to see instant changes!
+
 ## Troubleshooting
 
 If static files aren't loading in development:

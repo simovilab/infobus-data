@@ -44,8 +44,13 @@ services:
       # Docker-specific environment variables that override env_file values if needed
       - DB_HOST=db  # Docker service name
       - REDIS_HOST=redis  # Docker service name
+      # Development optimizations for hot reload
+      - PYTHONUNBUFFERED=1  # Ensure Python output is not buffered
+      - PYTHONDONTWRITEBYTECODE=1  # Prevent Python from writing .pyc files
+      - WATCHDOG_POLLING=True  # Force polling for file changes (better for Docker volumes)
     volumes:
       - .:/app  # Mount current directory for live development
+      - /app/.venv  # Exclude .venv directory to prevent conflicts
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     depends_on:
@@ -61,14 +66,14 @@ services:
         "python",
         "manage.py",
         "runserver",
-        "0.0.0.0:8000",
+        "0.0.0.0:8000"
       ]
 
   # Celery Worker
   celery-worker:
     build:
       context: .
-      target: production
+      target: development  # Use development target for hot reload
     env_file:
       - .env        # Base configuration
       - .env.dev    # Development overrides (tracked)
@@ -77,6 +82,12 @@ services:
       # Docker-specific environment variables
       - DB_HOST=db  # Docker service name
       - REDIS_HOST=redis  # Docker service name
+      # Development optimizations for hot reload
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - .:/app  # Mount source code for hot reload
+      - /app/.venv  # Exclude .venv directory to prevent conflicts
     depends_on:
       db:
         condition: service_healthy
@@ -86,13 +97,18 @@ services:
         condition: service_started
     entrypoint: ["/app/docker-entrypoint.sh"]
     command:
-      ["uv", "run", "celery", "-A", "infobus_data", "worker", "--loglevel=info"]
+      [
+        "uv", "run", "watchmedo", "auto-restart",
+        "--patterns=*.py",
+        "--recursive", "--",
+        "celery", "-A", "infobus_data", "worker", "--loglevel=info"
+      ]
 
   # Celery Beat (Scheduler)
   celery-beat:
     build:
       context: .
-      target: production
+      target: development  # Use development target for hot reload
     env_file:
       - .env        # Base configuration
       - .env.dev    # Development overrides (tracked)
@@ -101,7 +117,12 @@ services:
       # Docker-specific environment variables
       - DB_HOST=db  # Docker service name
       - REDIS_HOST=redis  # Docker service name
+      # Development optimizations for hot reload
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
     volumes:
+      - .:/app  # Mount source code for hot reload
+      - /app/.venv  # Exclude .venv directory to prevent conflicts
       - celery_beat_data:/app/celerybeat-schedule
     depends_on:
       db:
