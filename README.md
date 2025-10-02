@@ -23,6 +23,8 @@
 - [Environment Configuration](ENV.md) - Environment variables setup
 - [Docker Setup](DOCKER.md) - Docker configuration details
 - [Production Deployment](PRODUCTION.md) - Production deployment guide
+- [`KPI Dictionary`](kpi_dictionary_en.md) - Definitions, formulas, assumptions, and edge cases for KPIs
+- [`Diccionario de KPIs`](kpi_dictionary_es.md) - Definiciones, fórmulas, supuestos y casos borde de los KPIs.
 
 ## 🛠️ Development
 
