@@ -35,6 +35,7 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default=[], cast=Csv())
 INSTALLED_APPS = [
     "daphne",
     "channels",
+    "gtfs_proxy.apps.GtfsProxyConfig",
     "dashboard.apps.DashboardConfig",
     "website.apps.WebsiteConfig",
     "django_celery_results",
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.gis",
 ]
 
 MIDDLEWARE = [
@@ -89,7 +91,18 @@ DATABASES = {
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT"),
     },
+    "infobus_main": {
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "NAME": config("MAIN_DB_NAME", default="infobus"),
+        "USER": config("MAIN_DB_USER", default="postgres"),
+        "PASSWORD": config("MAIN_DB_PASSWORD", default="postgres"),
+        "HOST": config("MAIN_DB_HOST", default="localhost"),
+        "PORT": config("MAIN_DB_PORT", default="5432"),
+    },
 }
+
+# Database routing
+DATABASE_ROUTERS = ['infobus_data.routers.DatabaseRouter']
 
 if platform.system() == "Darwin":
     GDAL_LIBRARY_PATH = config("GDAL_LIBRARY_PATH")

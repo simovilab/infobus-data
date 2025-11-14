@@ -1,15 +1,17 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database with TimescaleDB
   db:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:latest-pg16
     environment:
       POSTGRES_DB: infobus_data
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      TIMESCALEDB_TELEMETRY: "off"
+    command: postgres -c shared_preload_libraries=timescaledb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -20,7 +22,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -35,7 +37,7 @@ services:
       context: .
       target: development
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:8000"
     env_file:
       - .env        # Base configuration
       - .env.dev    # Development overrides (tracked)
@@ -144,6 +146,24 @@ services:
         "--scheduler=django_celery_beat.schedulers:DatabaseScheduler",
       ]
 
+  # Grafana for KPI Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   # Nginx (Optional - for production static file serving)
   nginx:
     image: nginx:alpine
@@ -164,6 +184,7 @@ volumes:
   static_volume:
   media_volume:
   celery_beat_data:
+  grafana_data:
 
 networks:
   default:
