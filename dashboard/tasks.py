@@ -1,4 +1,3 @@
-# dashboard/kpi_tasks_polars.py
 """
 KPI computation tasks using Polars DataFrames.
 All computations done in-memory, only KPI results saved to database.
@@ -19,13 +18,13 @@ from dashboard.models import (
     KPIFeedFreshness,
     KPIServiceGaps,
     KPIOccupancy,
+    Arrival,
+    Occupancy,
 )
 from dashboard.gtfs_mbta_data import (
     load_mbta_vehicle_positions,
     load_mbta_trip_updates,
     load_mbta_static_gtfs,
-    compute_departures_from_realtime,
-    compute_occupancy_from_realtime,
     compute_scheduled_headways,
     get_time_window,
 )
@@ -35,36 +34,84 @@ logger = logging.getLogger(__name__)
 # KPI Parameters
 DELAY_WINDOW_S = 60 * 60          # 60 minutes for OTP and delay
 HEADWAY_WINDOW_S = 30 * 60        # 30 minutes for headways / gaps
-PUNCTUALITY_THRESHOLD_S = 60      # 60s for "on time"
+PUNCTUALITY_THRESHOLD_S = 180      # 180s for "on time"
 MAX_ABS_DELAY_S = 1800            # Clip outliers to ±30 min
 SERVICE_GAP_FACTOR = 2.5          # k in gap definition
 MIN_SAMPLE_SIZE = 5               # Minimum events to report
+
+
+def load_arrivals_from_db(lookback_seconds: int = 7200) -> pl.DataFrame:
+    """
+    Load arrival records from database as Polars DataFrame.
+    
+    Args:
+        lookback_seconds: How far back to look (default: 2 hours)
+    
+    Returns:
+        Polars DataFrame with arrival data
+    """
+    cutoff = timezone.now() - timedelta(seconds=lookback_seconds)
+    
+    arrivals = Arrival.objects.filter(
+        observed_at__gte=cutoff
+    ).values(
+        'route_id', 'stop_id', 'trip_id', 'vehicle_id',
+        'observed_at', 'scheduled_at', 'delay_s'
+    )
+    
+    if not arrivals:
+        return pl.DataFrame()
+    
+    df = pl.DataFrame(list(arrivals))
+    logger.info(f"Loaded {len(df)} arrival records from database")
+    return df
+
+
+def load_occupancy_from_db(lookback_seconds: int = 7200) -> pl.DataFrame:
+    """
+    Load occupancy records from database as Polars DataFrame.
+    
+    Args:
+        lookback_seconds: How far back to look (default: 2 hours)
+    
+    Returns:
+        Polars DataFrame with occupancy data
+    """
+    cutoff = timezone.now() - timedelta(seconds=lookback_seconds)
+    
+    occupancy = Occupancy.objects.filter(
+        observed_at__gte=cutoff
+    ).values(
+        'route_id', 'vehicle_id', 'trip_id',
+        'observed_at', 'ratio'
+    )
+    
+    if not occupancy:
+        return pl.DataFrame()
+    
+    df = pl.DataFrame(list(occupancy))
+    logger.info(f"Loaded {len(df)} occupancy records from database")
+    return df
 
 
 @shared_task(name="kpi.compute_otp_and_average_delay")
 def compute_otp_and_average_delay(window_seconds: int = DELAY_WINDOW_S):
     """
     Compute On-Time Performance (%) and Average Delay (s) by route.
-    Downloads fresh MBTA data and computes KPIs using Polars.
+    Reads arrival data from database and computes KPIs using Polars.
     """
     try:
         now, window_start, window_end = get_time_window(window_seconds)
         logger.info(f"Computing OTP and delay for window {window_start} to {window_end}")
         
-        # Download fresh data
-        vehicle_positions = load_mbta_vehicle_positions()
-        trip_updates = load_mbta_trip_updates()
-        
-        if len(vehicle_positions) == 0 or len(trip_updates) == 0:
-            logger.warning("No vehicle positions or trip updates available")
-            return
-        
-        # Compute departures
-        departures = compute_departures_from_realtime(vehicle_positions, trip_updates)
+        # Load arrivals from database (lookback 2x window to ensure coverage)
+        departures = load_arrivals_from_db(lookback_seconds=window_seconds * 2)
         
         if len(departures) == 0:
-            logger.warning("No departure events computed")
+            logger.warning("No departure events in database")
             return
+        
+        logger.info(f"Computed {len(departures)} departure events")
         
         # Filter to time window
         departures_window = departures.filter(
@@ -173,24 +220,23 @@ def compute_otp_and_average_delay(window_seconds: int = DELAY_WINDOW_S):
 def compute_headway_adherence(window_seconds: int = HEADWAY_WINDOW_S):
     """
     Compute Headway Adherence (observed / scheduled) by route and stop.
-    Downloads fresh MBTA data and computes using Polars.
+    Reads arrival data from database and computes using Polars.
     """
     try:
         now, window_start, window_end = get_time_window(window_seconds)
         logger.info(f"Computing headway adherence for window {window_start} to {window_end}")
         
-        # Download fresh data
-        vehicle_positions = load_mbta_vehicle_positions()
-        trip_updates = load_mbta_trip_updates()
-        static_gtfs = load_mbta_static_gtfs()
+        # Load arrivals from database - USE ALL departures, not just window
+        # Headway calculation needs consecutive events which may span beyond window
+        # Lookback 3 hours to get enough consecutive events
+        departures = load_arrivals_from_db(lookback_seconds=10800)
         
-        if len(vehicle_positions) == 0 or len(trip_updates) == 0:
-            logger.warning("No realtime data available")
+        if len(departures) == 0:
+            logger.warning("No arrival data in database")
             return
         
-        # Compute departures - USE ALL departures, not just window
-        # Headway calculation needs consecutive events which may span beyond window
-        departures = compute_departures_from_realtime(vehicle_positions, trip_updates)
+        # Download static GTFS for scheduled headways
+        static_gtfs = load_mbta_static_gtfs()
         
         if len(departures) == 0:
             logger.warning("No departure events")
@@ -349,23 +395,22 @@ def compute_feed_freshness():
 def compute_service_gaps(window_seconds: int = HEADWAY_WINDOW_S):
     """
     Count service gaps (gaps > k * scheduled_headway) by route and stop.
-    Downloads fresh MBTA data and computes using Polars.
+    Reads arrival data from database and computes using Polars.
     """
     try:
         now, window_start, window_end = get_time_window(window_seconds)
         logger.info(f"Computing service gaps for window {window_start} to {window_end}")
         
-        # Download fresh data
-        vehicle_positions = load_mbta_vehicle_positions()
-        trip_updates = load_mbta_trip_updates()
-        static_gtfs = load_mbta_static_gtfs()
+        # Load arrivals from database - use broader window for gap detection
+        # Lookback 3 hours to detect gaps properly
+        departures = load_arrivals_from_db(lookback_seconds=10800)
         
-        if len(vehicle_positions) == 0 or len(trip_updates) == 0:
-            logger.warning("No realtime data available")
+        if len(departures) == 0:
+            logger.warning("No arrival data in database")
             return
         
-        # Compute departures
-        departures = compute_departures_from_realtime(vehicle_positions, trip_updates)
+        # Download static GTFS for scheduled headways
+        static_gtfs = load_mbta_static_gtfs()
         
         if len(departures) == 0:
             logger.warning("No departure events")
@@ -460,25 +505,20 @@ def compute_service_gaps(window_seconds: int = HEADWAY_WINDOW_S):
 def compute_occupancy(window_seconds: int = DELAY_WINDOW_S):
     """
     Compute average occupancy by route.
-    Downloads fresh MBTA data and computes using Polars.
+    Reads occupancy data from database and computes using Polars.
     """
     try:
         now, window_start, window_end = get_time_window(window_seconds)
         logger.info(f"Computing occupancy for window {window_start} to {window_end}")
         
-        # Download fresh data
-        vehicle_positions = load_mbta_vehicle_positions()
-        
-        if len(vehicle_positions) == 0:
-            logger.warning("No vehicle positions available")
-            return
-        
-        # Extract occupancy
-        occupancy = compute_occupancy_from_realtime(vehicle_positions)
+        # Load occupancy from database (lookback 2x window)
+        occupancy = load_occupancy_from_db(lookback_seconds=window_seconds * 2)
         
         if len(occupancy) == 0:
-            logger.warning("No occupancy data")
+            logger.warning("No occupancy data in database")
             return
+        
+        logger.info(f"Extracted {len(occupancy)} occupancy records")
         
         # Filter to time window
         occupancy_window = occupancy.filter(

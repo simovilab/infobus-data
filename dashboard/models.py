@@ -237,3 +237,80 @@ class KPIOccupancy(models.Model):
             f"= {self.average_ratio:.2f}"
         )
 
+
+class Arrival(models.Model):
+    """
+    Raw arrival/departure events from MBTA real-time data.
+    Used for computing KPIs like OTP and Average Delay.
+    Matches the 'arrivals' table created in migration 0004.
+    """
+    route_id = models.CharField(max_length=64)
+    stop_id = models.CharField(max_length=64)
+    trip_id = models.CharField(max_length=128, null=True, blank=True)
+    vehicle_id = models.CharField(max_length=64, null=True, blank=True)
+    observed_at = models.DateTimeField()
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+    delay_s = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "arrivals"
+        verbose_name = "Arrival"
+        verbose_name_plural = "Arrivals"
+        managed = False  # Table already exists from migration 0004
+
+    def __str__(self):
+        return f"Arrival {self.route_id} @ {self.stop_id} ({self.observed_at})"
+
+
+class Occupancy(models.Model):
+    """
+    Raw vehicle occupancy observations from MBTA real-time data.
+    Used for computing occupancy KPIs.
+    Matches the 'occupancy' table created in migration 0004.
+    """
+    route_id = models.CharField(max_length=64)
+    vehicle_id = models.CharField(max_length=64, null=True, blank=True)
+    trip_id = models.CharField(max_length=128, null=True, blank=True)
+    observed_at = models.DateTimeField()
+    ratio = models.FloatField(
+        help_text="Occupancy ratio 0-1 (fraction of capacity)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "occupancy"
+        verbose_name = "Occupancy"
+        verbose_name_plural = "Occupancy Observations"
+        managed = False  # Table already exists from migration 0004
+
+    def __str__(self):
+        return f"Occupancy {self.vehicle_id} ({self.occupancy_ratio:.2f})"
+
+
+class FeedStatus(models.Model):
+    """
+    Status tracking for MBTA real-time feeds.
+    Stores the freshness and health of data feeds.
+    Matches the 'feed_status' table created in migration 0004.
+    """
+    source = models.CharField(max_length=128, unique=True)
+    last_header_ts = models.DateTimeField(
+        help_text="Timestamp from the feed header"
+    )
+    last_updated = models.DateTimeField(auto_now=True)
+    status = models.CharField(
+        max_length=32,
+        default="active",
+        help_text="Feed status (active, stale, etc.)"
+    )
+
+    class Meta:
+        db_table = "feed_status"
+        verbose_name = "Feed Status"
+        verbose_name_plural = "Feed Status"
+        managed = False  # Table already exists from migration 0004
+
+    def __str__(self):
+        return f"{self.source}: {self.status}"
+
