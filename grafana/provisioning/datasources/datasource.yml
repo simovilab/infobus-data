@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: db:5432
+    database: infobus_data
+    user: postgres
+    secureJsonData:
+      password: 'postgres'
+    jsonData:
+      sslmode: 'disable'
+      postgresVersion: 1600
+      timescaledb: true
+    isDefault: true
+    editable: true
+    uid: postgresql
+    version: 1

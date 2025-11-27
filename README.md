@@ -17,12 +17,14 @@
    - Website: http://localhost:8000
    - Admin: http://localhost:8000/admin (admin/admin)
    - Health: http://localhost:8000/health/
+   - Grafana: http://localhost:3000 (admin/admin)
 
 ## 📚 Documentation
 
 - [Environment Configuration](ENV.md) - Environment variables setup
 - [Docker Setup](DOCKER.md) - Docker configuration details
 - [Production Deployment](PRODUCTION.md) - Production deployment guide
+- [Grafana Dashboards](GRAFANA.md) - KPI visualization and monitoring
 
 ## 🛠️ Development
 
@@ -47,8 +49,9 @@ celery -A infobus_data beat --scheduler django_celery_beat.schedulers:DatabaseSc
 ## 🏗️ Architecture
 
 - **Django** with Channels (ASGI)
-- **PostgreSQL** with PostGIS
+- **PostgreSQL** with TimescaleDB extension
 - **Redis** for caching and Celery
-- **Celery** for background tasks
+- **Celery** for background KPI computation
+- **Grafana** for KPI visualization
 - **Docker** for containerization
 - **Nginx** for production reverse proxy

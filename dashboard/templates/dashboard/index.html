@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infobus Data Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .routes-list {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .route-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .route-item:last-child {
+            border-bottom: none;
+        }
+        .route-name {
+            font-weight: bold;
+        }
+        .route-type {
+            background: #3498db;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        .success {
+            color: #27ae60;
+        }
+        .api-buttons {
+            margin-top: 20px;
+        }
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Infobus Data Dashboard</h1>
+            <p>Dashboard para consultar datos GTFS desde la base de datos principal</p>
+        </div>
+
+        <div class="status-card">
+            <h2>Estado de Conexión</h2>
+            <p class="{% if connection_status == 'Connected' %}success{% else %}error{% endif %}">
+                {{ connection_status }}
+            </p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">{{ routes_count }}</div>
+                <h3>Rutas</h3>
+                <p>Total de rutas en el sistema</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stop_times_count }}</div>
+                <h3>Horarios</h3>
+                <p>Total de horarios de paradas</p>
+            </div>
+        </div>
+
+        {% if sample_routes %}
+        <div class="routes-list">
+            <h2>Rutas de Ejemplo (Primeras 10)</h2>
+            {% for route in sample_routes %}
+            <div class="route-item">
+                <div>
+                    <div class="route-name">{{ route.route_short_name|default:"Sin nombre" }}</div>
+                    <div>{{ route.route_long_name|default:"Sin descripción" }}</div>
+                    <small>ID: {{ route.route_id }}</small>
+                </div>
+                <div class="route-type">
+                    {% if route.route_type == 3 %}Bus{% else %}Tipo {{ route.route_type }}{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="api-buttons">
+            <h2>APIs de Prueba</h2>
+            <a href="{% url 'dashboard:routes_api' %}" class="btn" target="_blank">Ver API de Rutas</a>
+            <a href="{% url 'dashboard:stop_times_api' %}" class="btn" target="_blank">Ver API de Horarios</a>
+        </div>
+
+        <div class="status-card">
+            <h3>Información Técnica</h3>
+            <ul>
+                <li>Base de datos principal: localhost:5432</li>
+                <li>Base de datos local: localhost:5433</li>
+                <li>Puerto web: 8001</li>
+                <li>Proxy models: Route, StopTime, Stop, Trip</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
