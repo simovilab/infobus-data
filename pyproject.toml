@@ -13,8 +13,10 @@ dependencies = [
     "django-celery-beat>=2.8.1",
     "django-celery-results>=2.6.0",
     "gunicorn>=23.0.0",
+    "polars>=1.35.2",
     "psycopg2-binary>=2.9.10",
     "python-decouple>=3.8",
+    "requests>=2.32.5",
 ]
 
 [dependency-groups]

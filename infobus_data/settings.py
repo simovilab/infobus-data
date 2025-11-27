@@ -35,7 +35,7 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default=[], cast=Csv())
 INSTALLED_APPS = [
     "daphne",
     "channels",
-    "gtfs_proxy.apps.GtfsProxyConfig",
+    # "gtfs_proxy.apps.GtfsProxyConfig",  # Disabled - using direct MBTA data instead
     "dashboard.apps.DashboardConfig",
     "website.apps.WebsiteConfig",
     "django_celery_results",
@@ -175,3 +175,19 @@ STATICFILES_FINDERS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# MBTA GTFS Data Sources
+MBTA_GTFS_URL = config(
+    "MBTA_GTFS_URL",
+    default="https://cdn.mbta.com/MBTA_GTFS.zip",
+)
+
+MBTA_TRIPUPDATES_URL = config(
+    "MBTA_TRIPUPDATES_URL",
+    default="https://cdn.mbta.com/realtime/TripUpdates.json",
+)
+
+MBTA_VEHICLEPOSITIONS_URL = config(
+    "MBTA_VEHICLEPOSITIONS_URL",
+    default="https://cdn.mbta.com/realtime/VehiclePositions.json",
+)
